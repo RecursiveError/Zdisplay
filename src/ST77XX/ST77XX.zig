@@ -9,7 +9,9 @@ pub const ST77XXTransType = enum { command, param, data };
 pub const ST77XXRGBEndian = enum(u8) { BGR = 0, RGB = 1 << 3 };
 pub const ST77XXColorSize = enum(u8) { COLOR_12 = 0b011, COLOR_16 = 0b101, COLOR_18 = 0b110 };
 
-pub const DisplayCtrl = enum(u8) { display_on = 0x29, display_off = 0x28 };
+pub const DisplayCtrl = enum(u8) { display_on = @intFromEnum(ST77XXCommand.DISPON), display_off = @intFromEnum(ST77XXCommand.DISPOFF) };
+pub const InvertColorCtril = enum(u8) { disable = @intFromEnum(ST77XXCommand.INVOFF), enable = @intFromEnum(ST77XXCommand.INVON) };
+pub const InvertAxisCtrl = enum(u8) { x = 1 << 6, y = 1 << 7, xy = 1 << 6 | 1 << 7 };
 
 pub const ST77XX_interface_callback = fn (transtype: ST77XXTransType, data: []const u8, user_params: *const anyopaque) ST77XXError!void;
 
@@ -22,7 +24,7 @@ pub const ST77XX = struct {
     hoz_res: u32,
     madctl_state: u8,
     colmod_state: u8,
-    x_offset: u9,
+    x_offset: u8,
     y_offset: u8,
     interface: *const ST77XX_interface_callback,
     io_interface: *const ST77XX_pinctrl_callback,
@@ -91,12 +93,30 @@ pub const ST77XX = struct {
         Self.delay(120 * 1000);
     }
 
-    pub fn invert_color_ctrl(Self: *ST77XX) ST77XXError!void {
-        _ = Self; //Todo
+    pub fn invert_color_ctrl(Self: *ST77XX, control: InvertColorCtril) ST77XXError!void {
+        try Self.internal_interface(ST77XXTransType.command, &[_]u8{@intFromEnum(control)}, Self.user_data);
     }
 
-    pub fn invert_axis_ctrl(Self: *ST77XX) ST77XXError!void {
-        _ = Self; //Todo
+    pub fn invert_axis_ctrl(Self: *ST77XX, axis: InvertAxisCtrl, invert: bool) ST77XXError!void {
+        Self.madctl_state &= ~axis;
+        if (invert) {
+            Self.madctl_state |= axis;
+        }
+        try Self.internal_interface(ST77XXTransType.command, &[_]u8{@intFromEnum(ST77XXCommand.MADCTL)}, Self.user_data);
+        try Self.internal_interface(ST77XXTransType.param, &[_]u8{Self.madctl_state}, Self.user_data);
+    }
+
+    pub fn swap_axis_ctrl(Self: *ST77XX, swap: bool) ST77XXError!void {
+        Self.madctl_state &= ~(1 << 5);
+        if (swap) {
+            Self.madctl_state |= (1 << 5);
+        }
+        try Self.internal_interface(ST77XXTransType.command, &[_]u8{@intFromEnum(ST77XXCommand.MADCTL)}, Self.user_data);
+        try Self.internal_interface(ST77XXTransType.param, &[_]u8{Self.madctl_state}, Self.user_data);
+    }
+    pub fn set_offset(Self: *ST77XX, x_offset: u8, y_offset: u8) void {
+        Self.x_offset = x_offset;
+        Self.y_offset = y_offset;
     }
     pub fn send_pixel_map(Self: *ST77XX, x0: u32, x1: u32, y0: u32, y1: u32, color_map: []const u8) ST77XXError!void {
         //error checks
