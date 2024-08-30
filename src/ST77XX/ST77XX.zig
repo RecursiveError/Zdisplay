@@ -107,9 +107,9 @@ pub const ST77XX = struct {
     }
 
     pub fn swap_axis_ctrl(Self: *ST77XX, swap: bool) ST77XXError!void {
-        Self.madctl_state &= ~(1 << 5);
+        Self.madctl_state &= ~(@as(u8, 1 << 5));
         if (swap) {
-            Self.madctl_state |= (1 << 5);
+            Self.madctl_state |= (@as(u8, 1 << 5));
         }
         try Self.internal_interface(ST77XXTransType.command, &[_]u8{@intFromEnum(ST77XXCommand.MADCTL)}, Self.user_data);
         try Self.internal_interface(ST77XXTransType.param, &[_]u8{Self.madctl_state}, Self.user_data);
